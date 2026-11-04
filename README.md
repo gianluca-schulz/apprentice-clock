@@ -42,4 +42,30 @@ The data is stored in a database. Each entry has these fixed fields:
 
 ## Run it locally
 
-To be added.
+The backend currently has one endpoint, a health check.
+
+1. Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/). It also downloads the right Python version for the project.
+2. Go to the backend folder:
+
+   ```bash
+   cd backend
+   ```
+
+3. Install the dependencies:
+
+   ```bash
+   uv sync
+   ```
+
+4. Start the development server. It reloads automatically when you change a file:
+
+   ```bash
+   uv run fastapi dev
+   ```
+
+5. Open the health check in your browser: <http://localhost:8000/api/v1/health>. It should answer with `{"status":"ok"}`. The API docs are at <http://localhost:8000/docs>.
+6. Optional: call the health check from a second terminal with `curl`. The option `-i` also shows the status code and the headers of the response:
+
+   ```bash
+   curl -i http://localhost:8000/api/v1/health
+   ```
