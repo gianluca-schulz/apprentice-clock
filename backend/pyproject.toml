@@ -1,7 +1,7 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "Backend for tracking apprentices' work hours. It requires the user to write a daily report for their training log before clocking out."
 readme = "README.md"
 authors = [
     { name = "Gianluca Schulz", email = "348162122+GianlucaSchulz@users.noreply.github.com" }
