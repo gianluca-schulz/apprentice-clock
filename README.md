@@ -69,3 +69,22 @@ The backend currently has one endpoint, a health check.
    ```bash
    curl -i http://localhost:8000/api/v1/health
    ```
+
+## Run the tests
+
+The tests use [`pytest`](https://docs.pytest.org/). They live in `backend/tests/`, split into `unit/` and `integration/`. The test client calls the app directly, so you do not need to start the server first.
+
+1. Go to the backend folder and install the dependencies, if you have not done so yet:
+
+   ```bash
+   cd backend
+   uv sync
+   ```
+
+2. Run all tests. The option `-v` shows the name and the result of every test:
+
+   ```bash
+   uv run pytest -v
+   ```
+
+3. A passing run ends with a line like `1 passed`. If a test fails, pytest shows which `assert` failed and the expected and the actual value.
