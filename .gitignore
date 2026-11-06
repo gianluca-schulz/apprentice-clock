@@ -22,3 +22,6 @@ wheels/
 
 # Node
 node_modules/
+
+# VSCode
+.vscode/

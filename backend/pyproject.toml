@@ -1,0 +1,21 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Backend for tracking apprentices' work hours. It requires the user to write a daily report for their training log before clocking out."
+readme = "README.md"
+authors = [
+    { name = "Gianluca Schulz", email = "348162122+GianlucaSchulz@users.noreply.github.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]>=0.162.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+line-length = 120
