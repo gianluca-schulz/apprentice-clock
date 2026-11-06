@@ -5,4 +5,4 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 ENV PATH="/app/.venv/bin:$PATH"
 COPY /app /app/app
-CMD ["fastapi","run","app/main.py"]
+CMD ["uvicorn","app.main:app","--host","0.0.0.0"]
