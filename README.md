@@ -9,17 +9,16 @@ Daily reports are easy to forget. Often nobody checks them right away, so appren
 ## Who it is for
 
 - **Apprentices**, who have to clock in and out anyway and no longer need to remember the reports separately.
-- **Companies**, who no longer need to ask apprentices for their reports. The reports are already in the database and can be signed quickly.
 
 ## Features (first version)
 
+- Sign-up and login
 - Clock-in and clock-out functions
 - A required daily report before clocking out
-- Every user has their own unique ID
+- Download of the written reports
 
 ## Out of scope for now
 
-- Login function (planned for a later phase)
 - Generating a weekly report as a PDF from the daily reports
 - Signing of reports by the company
 
