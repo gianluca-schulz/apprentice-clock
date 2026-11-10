@@ -89,6 +89,63 @@ The tests use [`pytest`](https://docs.pytest.org/). They live in `backend/tests/
 
 3. A passing run ends with a line like `1 passed`. If a test fails, pytest shows which `assert` failed and the expected and the actual value.
 
+## Run the database
+
+PostgreSQL runs in a container, described in `docker-compose.yml` in the root folder. You need [Docker Desktop](https://www.docker.com/products/docker-desktop/), and it must be running. The backend does not use the database yet, but it will once the user model is added.
+
+1. In the root folder, start the database. The option `-d` runs it in the background:
+
+   ```bash
+   docker compose up -d
+   ```
+
+2. Check the status. Wait until the column `STATUS` shows `healthy`. That is the health check of the service passing:
+
+   ```bash
+   docker compose ps
+   ```
+
+3. Connect to the database with `psql`, the command line client of PostgreSQL. It runs inside the container, so you do not have to install it. Leave it again with `\q`:
+
+   ```bash
+   docker compose exec postgres psql -U apprentice-clock -d apprentice-clock
+   ```
+
+4. Stop the database. The data stays in the named volume `apprentice-clock_postgresql`, so it is still there after the next `docker compose up -d`:
+
+   ```bash
+   docker compose down
+   ```
+
+5. To start from an empty database, delete the volume as well. The option `-v` removes the volume and with it all data, so only do this on your computer:
+
+   ```bash
+   docker compose down -v
+   ```
+
+Port 5433 on your computer is mapped to port 5432 in the container. That is why the connection from the backend uses `localhost:5433`.
+
+## Configure the backend
+
+The backend reads its settings from environment variables, or from the file `backend/.env`. Right now there is one setting, `DATABASE_URL`, the address of the database.
+
+1. Go to the backend folder and copy the example file. `.env.example` is committed to Git, `.env` is ignored by Git, so your own values never end up in the repository:
+
+   ```bash
+   cd backend
+   cp .env.example .env
+   ```
+
+2. Open `backend/.env` and replace the placeholders with the values from `docker-compose.yml`: user, password, database name and the port on your computer. The format of the URL is:
+
+   ```
+   postgresql+psycopg://<user>:<password>@<host>:<port>/<database>
+   ```
+
+3. If `DATABASE_URL` is missing, creating the settings fails with `Field required`. That is on purpose: the app should not start with a wrong or guessed database.
+
+The password in `docker-compose.yml` only protects a throwaway database on your own computer. A password for production never goes into Git. It is set as an environment variable on the server.
+
 ## Run it in Docker
 
 The backend also runs as a container. You need [Docker Desktop](https://www.docker.com/products/docker-desktop/), and it must be running.
