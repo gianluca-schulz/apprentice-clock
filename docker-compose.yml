@@ -1,0 +1,19 @@
+name: apprentice-clock
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: apprentice-clock
+      POSTGRES_USER: apprentice-clock
+      POSTGRES_PASSWORD: apprentice-clock
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgresql:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apprentice-clock -d apprentice-clock"]
+      interval: 5s
+      timeout: 5s
+      retries: 10   
+volumes:
+  postgresql:
