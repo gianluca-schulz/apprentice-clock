@@ -30,14 +30,14 @@ The server never stores the password, only a hash of it. At login it hashes what
 
 - `email_confirmed_at` (`timestamptz`, nullable): when the address was confirmed. Planned as the second migration.
 
-## `time_entries` (planned, not part of week 3)
+## `reports` (planned, not part of week 3)
 
 One row per work session: one clock-in and, later, one clock-out with its daily report.
 
 | Column | Type | Constraints | Notes |
 | --- | --- | --- | --- |
 | `id` | `uuid` | primary key | |
-| `user_id` | `uuid` | `NOT NULL`, foreign key to `users.id` with `ON DELETE RESTRICT` | Whose entry this is. |
+| `user_id` | `uuid` | `NOT NULL`, foreign key to `users.id` with `ON DELETE CASCADE` | Whose entry this is. |
 | `clock_in` | `timestamptz` | `NOT NULL` | |
 | `clock_out` | `timestamptz` | nullable | `NULL` while the entry is open. |
 | `report` | `text` | nullable | `NULL` while the entry is open. |
@@ -55,6 +55,6 @@ Hours worked are calculated from `clock_in` and `clock_out`, not from these two 
 
 ### Open points
 
-- Decided: the foreign key `user_id` uses `ON DELETE RESTRICT`. Entries must not vanish when a user is deleted, because the entries are the training log and must stay complete. With `RESTRICT`, Postgres refuses to delete a user who still has entries, so a wrong `DELETE` cannot wipe someone's hours and reports. `CASCADE` would delete the entries, and `SET NULL` does not work with `NOT NULL`.
-- Idea for later: a soft delete (for example a `deleted_at` column on `users`) instead of really deleting users.
-- Decided: no `CHECK` constraint for "clock-out requires a report" for now. `time_entries` is not built in week 3, and the API enforces the rule first. What counts as a valid report (for example a minimum length) is a product decision that belongs in the API. A `CHECK` constraint can be added later through a migration, as long as the existing data already follows the rule.
+- Decided: the foreign key `user_id` uses `ON DELETE CASCADE`. When a user deletes their account, Postgres deletes all their entries too. At the start the app is only for the apprentice, not for a company, so the data belongs to the apprentice and does not have to be kept anywhere else. This replaces the first decision (`RESTRICT`), which was changed after the review by Max. Trade-off: a wrong `DELETE` on `users` really wipes someone's hours and reports, so deleting a user must only happen through a deliberate "delete my account" action. `SET NULL` does not work with `NOT NULL`.
+- Not planned: a soft delete (for example a `deleted_at` column on `users`), because deleting an account should really remove the data. This can be revisited if a company needs to keep the training log.
+- Decided: no `CHECK` constraint for "clock-out requires a report" for now. `reports` is not built in week 3, and the API enforces the rule first. What counts as a valid report (for example a minimum length) is a product decision that belongs in the API. A `CHECK` constraint can be added later through a migration, as long as the existing data already follows the rule.
