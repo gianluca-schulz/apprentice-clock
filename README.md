@@ -145,6 +145,41 @@ The backend reads its settings from environment variables, or from the file `bac
 
 The password in `docker-compose.yml` only protects a throwaway database on your own computer. A password for production never goes into Git. It is set as an environment variable on the server.
 
+## Run the migrations
+
+The tables of the database are created and changed only through migrations, never directly from the models. A migration is a versioned script in `backend/migrations/versions/`. [Alembic](https://alembic.sqlalchemy.org/) runs them in order and remembers in the table `alembic_version` which one a database has already received. The database must be running and `backend/.env` must be set up, as described above. All commands run in the backend folder.
+
+1. Bring the database up to date. `head` means the newest migration. Alembic runs every migration the database does not have yet, so this is also the command for a new, empty database:
+
+   ```bash
+   cd backend
+   uv run alembic upgrade head
+   ```
+
+2. Check which migration the database is at. The output shows the revision ID, and `(head)` means it is the newest one:
+
+   ```bash
+   uv run alembic current
+   ```
+
+3. To change the schema, first change the model in `backend/app/models/`. Then let Alembic compare the models with the database and write a new migration. The option `-m` is a short description of the change:
+
+   ```bash
+   uv run alembic revision --autogenerate -m "add email_confirmed_at to users"
+   ```
+
+   This only creates the file, it does not change the database. Open the new file in `backend/migrations/versions/` and read `upgrade()` and `downgrade()` before you continue. Autogenerate is a helper and misses some changes, such as a renamed column, which it sees as one column removed and another added. If the file is right, run step 1 to apply it.
+
+4. To undo the last migration, run its `downgrade()`. Afterwards, check the tables in `psql`:
+
+   ```bash
+   uv run alembic downgrade -1
+   ```
+
+   Be careful: a downgrade that drops a table or a column deletes the data in it for good. Use it on your own computer, not on a database with real data. To fix a mistake there, write a new migration instead.
+
+5. The migration files are generated and use the old style of Python typing. That is why `ruff` ignores some rules in `backend/migrations/`, and why you run `uv run ruff format .` after generating a migration.
+
 ## Run it in Docker
 
 The backend also runs as a container. You need [Docker Desktop](https://www.docker.com/products/docker-desktop/), and it must be running.
