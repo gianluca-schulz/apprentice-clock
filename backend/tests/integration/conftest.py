@@ -2,38 +2,44 @@ from collections.abc import AsyncGenerator, AsyncIterator, Iterator
 
 import httpx
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine, AsyncEngine
 from testcontainers.community.postgres import PostgresContainer
 
-from app.database import get_session
-from app.main import app
 from app.models.base import Base
+from app.config import Settings
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from app.setup import create_app
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def database_url() -> Iterator[str]:
     with PostgresContainer("postgres:17-alpine", driver="psycopg") as postgres:
         yield postgres.get_connection_url()
 
+@pytest.fixture(scope="session")
+def app_settings(database_url: str) -> Settings:
+    return Settings(database_url=database_url)
+
+@pytest.fixture(scope="session")
+def app(app_settings) -> FastAPI:
+    return create_app(settings=app_settings)
 
 @pytest.fixture()
-async def session_factory(database_url: str) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
-    engine = create_async_engine(database_url)
+async def engine(app_settings) -> AsyncIterator[AsyncEngine]:
+    engine = create_async_engine(app_settings.database_url)
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.drop_all)
-        await connection.run_sync(Base.metadata.create_all)
-    session_maker = async_sessionmaker(engine, expire_on_commit=False)
-    yield session_maker
+        await connection.run_sync(Base.metadata.create_all)   
+    yield engine
     await engine.dispose()
 
+@pytest.fixture()
+def session_factory(engine) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(engine, expire_on_commit=False)
 
 @pytest.fixture()
-async def client(session_factory: async_sessionmaker[AsyncSession]) -> AsyncIterator[httpx.AsyncClient]:
-    async def session_override() -> AsyncGenerator[AsyncSession]:
-        async with session_factory() as session:
-            yield session
-
-    app.dependency_overrides[get_session] = session_override
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test/api/v1") as client:
+def client(app, engine) -> Iterator[TestClient]:
+    with TestClient(app) as client:           
         yield client
-    app.dependency_overrides.clear()

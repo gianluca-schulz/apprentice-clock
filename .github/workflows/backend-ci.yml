@@ -19,5 +19,3 @@ jobs:
       - run: uv run ruff check
       - run: uv run ruff format --check
       - run: uv run pytest
-        env:
-          DATABASE_URL: postgresql+psycopg://apprentice-clock:apprentice-clock@localhost:5433/apprentice-clock
