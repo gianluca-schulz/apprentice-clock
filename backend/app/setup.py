@@ -7,14 +7,13 @@ from app.api.health import router
 from app.config import AppState, Settings
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
-    app_settings = Settings() if settings is None else settings
+def create_app(settings: Settings) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        engine = create_async_engine(app_settings.database_url)
+        engine = create_async_engine(settings.database_url)
         session_factory = async_sessionmaker(engine, expire_on_commit=False)
-        app.state = AppState(settings=app_settings, session_factory=session_factory, engine=engine)
+        app.state = AppState(settings=settings, session_factory=session_factory, engine=engine)
         yield
         await engine.dispose()
 
