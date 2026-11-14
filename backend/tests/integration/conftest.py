@@ -19,7 +19,7 @@ def database_url() -> Iterator[str]:
 
 @pytest.fixture(scope="session")
 def app_settings(database_url: str) -> Settings:
-    return Settings(database_url=database_url)
+    return Settings(database_url=database_url, secret_key="testkey", token_expiration_days=1)
 
 
 @pytest.fixture(scope="session")
