@@ -43,6 +43,12 @@ def session_factory(engine) -> async_sessionmaker[AsyncSession]:
 
 
 @pytest.fixture()
+async def session(session_factory) -> AsyncIterator[AsyncSession]:
+    async with session_factory() as session:
+        yield session
+
+
+@pytest.fixture()
 def client(app, engine) -> Iterator[TestClient]:
     with TestClient(app) as client:
         yield client
