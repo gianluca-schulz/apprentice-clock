@@ -11,10 +11,7 @@ from app.services.auth import EmailAlreadyExistsError, InvalidCredentialsError, 
 @pytest.fixture()
 async def registered_user(session) -> User:
     body = RegisterRequest(
-        first_name="Testuser",
-        last_name="lastnameuser",
-        password="testpassword",
-        email="test@user.de"
+        first_name="Testuser", last_name="lastnameuser", password="testpassword", email="test@user.de"
     )
     return await register_user(session=session, body=body)
 
@@ -35,16 +32,12 @@ async def test_register_user(session):
 
 async def test_authenticate_user_with_different_email_casing(session):
     body = RegisterRequest(
-			first_name="Testuser",
-            last_name="lastnameuser",
-            password="testpassword",
-            email="TEST@USER.DE"
-		)
+        first_name="Testuser", last_name="lastnameuser", password="testpassword", email="TEST@USER.DE"
+    )
     user = await register_user(session=session, body=body)
     sign_in_body = SignInRequest(email=body.email, password=body.password.get_secret_value())
     user = await authenticate_user(session=session, body=sign_in_body)
     assert user.email == body.email
-
 
 
 async def test_register_user_duplicate_email(session, registered_user):
