@@ -12,13 +12,14 @@ One row per person who uses the app.
 | `first_name` | `text` | `NOT NULL` | |
 | `last_name` | `text` | `NOT NULL` | |
 | `email` | `text` | `NOT NULL`, `UNIQUE` | Used to log in. |
+| `email_confirmed_at` | `timestamptz` | nullable | When the address was confirmed. `NULL` until the user confirms it. |
 | `password_hash` | `text` | `NOT NULL` | Never the password itself, only a hash of it. |
 | `created_at` | `timestamptz` | `NOT NULL` | Set when the row is created. |
 | `updated_at` | `timestamptz` | `NOT NULL` | Changes every time the row is updated. |
 
 ### Why a password hash
 
-The server never stores the password, only a hash of it. At login it hashes what the user typed and compares the two hashes. If the database leaks, attackers get hashes, not the passwords. A hash is one-way, so attackers can only guess and hash each guess. A slow, salted algorithm (bcrypt or argon2) makes that guessing expensive. The algorithm is chosen when login is built.
+The server never stores the password, only a hash of it. At login it hashes what the user typed and compares the two hashes. If the database leaks, attackers get hashes, not the passwords. A hash is one-way, so attackers can only guess and hash each guess. A slow, salted algorithm (bcrypt or argon2) makes that guessing expensive. The algorithm is `bcrypt`, with salt and cost stored inside the hash string (for example `$2b$12$...`).
 
 ### Open points
 
@@ -26,9 +27,7 @@ The server never stores the password, only a hash of it. At login it hashes what
 - Decided: all timestamps use `timestamptz`, not `timestamp`. `timestamptz` stores a precise moment (converted to UTC), so it means the same thing in every time zone. A plain `timestamp` only stores the clock time without a zone, so it is unclear which moment it means. The same applies to `clock_in` and `clock_out`: hours worked is the difference between two moments, and with `timestamptz` that stays correct across time zones and summer time changes.
 - Decided: emails are compared case-insensitively by lowercasing (and trimming whitespace) in the application before saving. Postgres does not do this itself, so every code path that saves an email must do it, otherwise the `UNIQUE` constraint would treat `Anna@example.com` and `anna@example.com` as different users.
 
-### Possible later columns
-
-- `email_confirmed_at` (`timestamptz`, nullable): when the address was confirmed. Planned as the second migration.
+- Decided: `email_confirmed_at` was added in the second migration (`add_email_confirmed_at_to_users`). Nothing sets it yet: registration leaves it `NULL`. Confirming addresses comes in a later week, together with the confirmation email.
 
 ## `reports` (planned, not part of week 3)
 
