@@ -19,7 +19,11 @@ def database_url() -> Iterator[str]:
 
 @pytest.fixture(scope="session")
 def app_settings(database_url: str) -> Settings:
-    return Settings(database_url=database_url, secret_key="testkey", token_expiration_days=1)
+    return Settings(
+        database_url=database_url,
+        secret_key="testkeyhastbelongersowemakeitwaylongerthanbefore",
+        token_expiration_days=1,
+    )
 
 
 @pytest.fixture(scope="session")
@@ -40,6 +44,12 @@ async def engine(app_settings) -> AsyncIterator[AsyncEngine]:
 @pytest.fixture()
 def session_factory(engine) -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(engine, expire_on_commit=False)
+
+
+@pytest.fixture()
+async def session(session_factory) -> AsyncIterator[AsyncSession]:
+    async with session_factory() as session:
+        yield session
 
 
 @pytest.fixture()
