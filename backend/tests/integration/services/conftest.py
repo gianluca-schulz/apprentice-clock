@@ -5,7 +5,7 @@ from app.services.auth import register_user
 
 
 @pytest.fixture()
-async def registered_user(session) -> RegisterRequest:
+async def registered_user_data(session) -> RegisterRequest:
     body = RegisterRequest(
         first_name="Testuser", last_name="lastnameuser", password="testpassword", email="test@user.de"
     )
