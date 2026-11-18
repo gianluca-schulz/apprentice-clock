@@ -3,17 +3,8 @@ from datetime import datetime
 import pytest
 
 from app.core.auth import verify_password
-from app.models.user import User
 from app.schemas.auth import RegisterRequest, SignInRequest
 from app.services.auth import EmailAlreadyExistsError, InvalidCredentialsError, authenticate_user, register_user
-
-
-@pytest.fixture()
-async def registered_user(session) -> User:
-    body = RegisterRequest(
-        first_name="Testuser", last_name="lastnameuser", password="testpassword", email="test@user.de"
-    )
-    return await register_user(session=session, body=body)
 
 
 async def test_register_user(session):
@@ -51,14 +42,10 @@ async def test_register_user_duplicate_email(session, registered_user):
         await register_user(session=session, body=body)
 
 
-async def test_authenticate_user(session):
-    body = RegisterRequest(
-        first_name="Testuser", last_name="lastnameuser", password="testpassword", email="test@user.de"
-    )
-    await register_user(session=session, body=body)
-    sign_in_body = SignInRequest(email=body.email, password=body.password.get_secret_value())
+async def test_authenticate_user(session, registered_user):
+    sign_in_body = SignInRequest(email=registered_user.email, password=registered_user.password.get_secret_value())
     user = await authenticate_user(session=session, body=sign_in_body)
-    assert user.email == body.email
+    assert user.email == registered_user.email
 
 
 async def test_authenticate_user_not_found(session):
@@ -67,21 +54,13 @@ async def test_authenticate_user_not_found(session):
         await authenticate_user(session=session, body=sign_in_body)
 
 
-async def test_authenticate_user_wrong_pw_raises_error(session):
-    body = RegisterRequest(
-        first_name="Testuser", last_name="lastnameuser", password="testpassword", email="test@user.de"
-    )
-    await register_user(session=session, body=body)
-    sign_in_body = SignInRequest(email=body.email, password="wrongpassword")
+async def test_authenticate_user_wrong_pw_raises_error(session, registered_user):
+    sign_in_body = SignInRequest(email=registered_user.email, password="wrongpassword")
     with pytest.raises(InvalidCredentialsError):
         await authenticate_user(session=session, body=sign_in_body)
 
 
-async def test_authenticate_user_invalid_pw_raises_error(session):
-    body = RegisterRequest(
-        first_name="Testuser", last_name="lastnameuser", password="testpassword", email="test@user.de"
-    )
-    await register_user(session=session, body=body)
-    sign_in_body = SignInRequest(email=body.email, password="a" * 100)
+async def test_authenticate_user_invalid_pw_raises_error(session, registered_user):
+    sign_in_body = SignInRequest(email=registered_user.email, password="a" * 100)
     with pytest.raises(InvalidCredentialsError):
         await authenticate_user(session=session, body=sign_in_body)
