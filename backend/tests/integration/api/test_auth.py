@@ -15,15 +15,15 @@ def test_register_works_and_returns_a_token(client):
     assert response.json()["token_type"] == "bearer"
 
 
-def test_duplicate_email_gives_409(client):
-    response = client.post(
-        "/api/v1/auth/register",
-        json={"first_name": "Ulrich", "last_name": "Ulrichson", "email": "ulli@ullrich.de", "password": "1234567acht"},
-    )
-    assert response.status_code == 201
+def test_duplicate_email_gives_409(client, registered_user):
     response2 = client.post(
         "/api/v1/auth/register",
-        json={"first_name": "Ulla", "last_name": "Ullason", "email": "ulli@ullrich.de", "password": "123456sieben8"},
+        json={
+            "first_name": "Ulla",
+            "last_name": "Ullason",
+            "email": registered_user.email,
+            "password": "123456sieben8",
+        },
     )
     assert response2.status_code == 409
 
@@ -63,27 +63,40 @@ def test_valid_token_returns_user_response(client, registered_user):
     response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {registered_user.access_token}"})
     assert response.status_code == 200
     body = response.json()
+    assert body["id"] == str(registered_user.id)
     assert body["first_name"] == registered_user.first_name
     assert body["last_name"] == registered_user.last_name
     assert body["email"] == registered_user.email
     assert "password_hash" not in body
 
 
-def test_no_token_returns_401_and_authentication_required_message(client):
+def test_no_token_gives_401(client):
     response = client.get("/api/v1/auth/me")
     assert response.status_code == 401
     body = response.json()
     assert body["detail"] == "authentication required"
 
 
-def test_malformed_token_returns_401_and_invalid_credentials_message(client):
+def test_malformed_token_gives_401(client):
     response = client.get("/api/v1/auth/me", headers={"Authorization": "Bearer malformed.test.token"})
     assert response.status_code == 401
     body = response.json()
     assert body["detail"] == "invalid credentials"
 
 
-def test_expired_token_returns_401_and_invalid_credentials_message(client, app_settings, registered_user):
+def test_wrong_signature_gives_401(client, registered_user):
+    secret_key = "secret_key_wrong_signature_very_looooooong"
+    user_id = str(registered_user.id)
+    payload = {"sub": user_id, "exp": datetime.now(UTC) + timedelta(minutes=1)}
+    token = jwt.encode(payload=payload, key=secret_key, algorithm="HS256")
+    header = {"Authorization": f"Bearer {token}"}
+    response = client.get("/api/v1/auth/me", headers=header)
+    assert response.status_code == 401
+    body = response.json()
+    assert body["detail"] == "invalid credentials"
+
+
+def test_expired_token_gives_401(client, app_settings, registered_user):
     secret_key = app_settings.secret_key
     user_id = str(registered_user.id)
     payload = {"sub": user_id, "exp": datetime.now(UTC) - timedelta(seconds=10)}
@@ -95,7 +108,7 @@ def test_expired_token_returns_401_and_invalid_credentials_message(client, app_s
     assert body["detail"] == "invalid credentials"
 
 
-async def test_deleted_user_gives_401_and_invalid_credentials_message(client, session, registered_user):
+async def test_deleted_user_gives_401(client, session, registered_user):
     user = await session.get(User, registered_user.id)
     assert user is not None
     await session.delete(user)
