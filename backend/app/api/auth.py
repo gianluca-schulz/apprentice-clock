@@ -1,13 +1,9 @@
-from typing import Annotated
+from fastapi import APIRouter, HTTPException, status
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.config import Settings
 from app.core.auth import generate_token
-from app.database import get_session
 from app.dependencies.auth import CurrentUser
-from app.dependencies.settings import get_settings
+from app.dependencies.database import CurrentSession
+from app.dependencies.settings import CurrentSettings
 from app.schemas.auth import RegisterRequest, SignInRequest, TokenResponse, UserResponse
 from app.services.auth import EmailAlreadyExistsError, InvalidCredentialsError, authenticate_user, register_user
 
@@ -16,8 +12,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def post_user(
-    session: Annotated[AsyncSession, Depends(get_session)],
-    settings: Annotated[Settings, Depends(get_settings)],
+    session: CurrentSession,
+    settings: CurrentSettings,
     request: RegisterRequest,
 ) -> TokenResponse:
     try:
@@ -29,8 +25,8 @@ async def post_user(
 
 @router.post("/token", status_code=status.HTTP_200_OK)
 async def post_token(
-    session: Annotated[AsyncSession, Depends(get_session)],
-    settings: Annotated[Settings, Depends(get_settings)],
+    session: CurrentSession,
+    settings: CurrentSettings,
     request: SignInRequest,
 ) -> TokenResponse:
     try:

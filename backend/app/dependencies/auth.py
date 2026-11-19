@@ -3,12 +3,10 @@ from typing import Annotated
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import Settings
 from app.core.auth import TokenData, decode_token
-from app.database import get_session
-from app.dependencies.settings import get_settings
+from app.dependencies.database import CurrentSession
+from app.dependencies.settings import CurrentSettings
 from app.models.user import User
 
 bearer = HTTPBearer(auto_error=False)
@@ -17,8 +15,8 @@ INVALID_TOKEN_DETAIL = "invalid credentials"
 
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
-    session: Annotated[AsyncSession, Depends(get_session)],
-    settings: Annotated[Settings, Depends(get_settings)],
+    session: CurrentSession,
+    settings: CurrentSettings,
 ) -> User:
 
     if credentials is None:
