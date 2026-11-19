@@ -1,34 +1,38 @@
+from dataclasses import dataclass
+from uuid import UUID
+
 import pytest
-from sqlalchemy import select
 
-from app.models.user import User
-from app.schemas.auth import RegisterRequest
+from app.core.auth import decode_token
+
+
+@dataclass
+class RegisteredUser:
+    id: UUID
+    first_name: str
+    last_name: str
+    email: str
+    password: str
+    access_token: str
 
 
 @pytest.fixture()
-def registered_user(client) -> dict[str, str]:
-    registration_data = RegisterRequest(
-        first_name="Ulrich", last_name="Ulrichson", email="ulli@ullrich.de", password="1234567acht"
-    )
-    json_registration_data = registration_data.model_dump(mode="json")
-    json_registration_data["password"] = registration_data.password.get_secret_value()
-    response = client.post("/api/v1/auth/register", json=json_registration_data)
+def registered_user(client, app_settings) -> RegisteredUser:
+    register_data = {
+        "first_name": "Ulrich",
+        "last_name": "Ulrichson",
+        "email": "ulrich@son.com",
+        "password": "ullisooohn123987",
+    }
+    response = client.post("/api/v1/auth/register", json=register_data)
     assert response.status_code == 201
-    return json_registration_data
-
-
-@pytest.fixture()
-def access_token(client, registered_user) -> str:
-    token_response = client.post(
-        "/api/v1/auth/token", json={"email": registered_user["email"], "password": registered_user["password"]}
+    access_token = response.json()["access_token"]
+    token_data = decode_token(access_token, app_settings.secret_key)
+    return RegisteredUser(
+        id=token_data.sub,
+        first_name=register_data["first_name"],
+        last_name=register_data["last_name"],
+        email=register_data["email"],
+        password=register_data["password"],
+        access_token=access_token,
     )
-    assert token_response.status_code == 200
-    login_body = token_response.json()
-    return login_body["access_token"]
-
-
-@pytest.fixture()
-async def db_user(registered_user, session) -> User:
-    user = await session.scalar(select(User).where(User.email == registered_user["email"]))
-    assert user is not None
-    return user
