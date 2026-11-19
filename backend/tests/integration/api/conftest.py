@@ -1,5 +1,7 @@
 import pytest
+from sqlalchemy import select
 
+from app.models.user import User
 from app.schemas.auth import RegisterRequest
 
 
@@ -13,3 +15,20 @@ def registered_user(client) -> dict[str, str]:
     response = client.post("/api/v1/auth/register", json=json_registration_data)
     assert response.status_code == 201
     return json_registration_data
+
+
+@pytest.fixture()
+def access_token(client, registered_user) -> str:
+    token_response = client.post(
+        "/api/v1/auth/token", json={"email": registered_user["email"], "password": registered_user["password"]}
+    )
+    assert token_response.status_code == 200
+    login_body = token_response.json()
+    return login_body["access_token"]
+
+
+@pytest.fixture()
+async def db_user(registered_user, session) -> User:
+    user = await session.scalar(select(User).where(User.email == registered_user["email"]))
+    assert user is not None
+    return user
