@@ -14,10 +14,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def post_user(
     session: CurrentSession,
     settings: CurrentSettings,
-    request: RegisterRequest,
+    body: RegisterRequest,
 ) -> TokenResponse:
     try:
-        user = await register_user(session, request)
+        user = await register_user(session, body)
     except EmailAlreadyExistsError:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="registration failed")
     return TokenResponse(access_token=generate_token(user.id, settings.secret_key, settings.token_expiration_days))
@@ -27,10 +27,10 @@ async def post_user(
 async def post_token(
     session: CurrentSession,
     settings: CurrentSettings,
-    request: SignInRequest,
+    body: SignInRequest,
 ) -> TokenResponse:
     try:
-        user = await authenticate_user(session=session, body=request)
+        user = await authenticate_user(session=session, body=body)
     except InvalidCredentialsError:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
     return TokenResponse(access_token=generate_token(user.id, settings.secret_key, settings.token_expiration_days))
@@ -38,11 +38,4 @@ async def post_token(
 
 @router.get("/me", status_code=status.HTTP_200_OK)
 async def get_me(user: CurrentUser) -> UserResponse:
-    return UserResponse(
-        id=user.id,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        email=user.email,
-        created_at=user.created_at,
-        updated_at=user.updated_at,
-    )
+    return UserResponse.model_validate(user)
