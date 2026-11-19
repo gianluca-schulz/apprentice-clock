@@ -1,3 +1,6 @@
+from datetime import UTC, datetime, timedelta
+
+import jwt
 
 
 def test_register_works_and_returns_a_token(client):
@@ -54,35 +57,46 @@ def test_unknown_email_gives_401(client, registered_user):
     assert login_response.status_code == 401
 
 
-""""
-┌─────────────────┬───────┬────────────────────────────┐
-│      Case       │ Setup │ Expected status and detail │
-├─────────────────┼───────┼────────────────────────────┤
-│ valid token     │ ?     │ 200, and the user's fields │
-├─────────────────┼───────┼────────────────────────────┤
-│ no token        │ ?     │ 401, message A             │
-├─────────────────┼───────┼────────────────────────────┤
-│ malformed token │ ?     │ 401, message B             │
-├─────────────────┼───────┼────────────────────────────┤
-│ expired token   │ ?     │ 401, message B             │
-├─────────────────┼───────┼────────────────────────────┤
-│ deleted user    │ ?     │ 401, message B             │
-└─────────────────┴───────┴────────────────────────────┘
-
-"""
+def test_valid_token_returns_user_response(client, registered_user, access_token):
+    response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {access_token}"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["first_name"] == registered_user["first_name"]
+    assert body["last_name"] == registered_user["last_name"]
+    assert body["email"] == registered_user["email"]
+    assert "password_hash" not in body
 
 
-def test_valid_token_returns_user_response(client, registered_user):
-    response_token = client.post(
-        "/api/v1/auth/token", json={"email": registered_user["email"], "password": registered_user["password"]}
-    )
-    assert response_token.status_code == 200
-    response_token_changed = response_token.json()
-    token = response_token_changed["access_token"]
-    me_response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
-    assert me_response.status_code == 200
-    me_response = me_response.json()
-    assert me_response["first_name"] == registered_user["first_name"]
-    assert me_response["last_name"] == registered_user["last_name"]
-    assert me_response["email"] == registered_user["email"]
-    assert "password_hash" not in me_response
+def test_no_token_returns_401_and_authentication_required_message(client):
+    response = client.get("/api/v1/auth/me")
+    assert response.status_code == 401
+    body = response.json()
+    assert body["detail"] == "authentication required"
+
+
+def test_malformed_token_returns_401_and_invalid_credentials_message(client):
+    response = client.get("/api/v1/auth/me", headers={"Authorization": "Bearer malformed.test.token"})
+    assert response.status_code == 401
+    body = response.json()
+    assert body["detail"] == "invalid credentials"
+
+
+async def test_expired_token_returns_401_and_invalid_credentials_message(client, app_settings, db_user):
+    secret_key = app_settings.secret_key
+    user_id = str(db_user.id)
+    payload = {"sub": user_id, "exp": datetime.now(UTC) - timedelta(seconds=10)}
+    token = jwt.encode(payload=payload, key=secret_key, algorithm="HS256")
+    header = {"Authorization": f"Bearer {token}"}
+    response = client.get("/api/v1/auth/me", headers=header)
+    assert response.status_code == 401
+    body = response.json()
+    assert body["detail"] == "invalid credentials"
+
+
+async def test_deleted_user_gives_401_and_invalid_credentials_message(client, session, access_token, db_user):
+    await session.delete(db_user)
+    await session.commit()
+    response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {access_token}"})
+    assert response.status_code == 401
+    body = response.json()
+    assert body["detail"] == "invalid credentials"
