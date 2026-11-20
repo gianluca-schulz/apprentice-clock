@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import AfterValidator, BaseModel, EmailStr, SecretStr, StringConstraints
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, SecretStr, StringConstraints
 
 NameString = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)]
 PasswordString = Annotated[SecretStr, StringConstraints(min_length=8, max_length=32)]
@@ -27,6 +27,7 @@ class TokenResponse(BaseModel):
 
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: UUID
     first_name: str
     last_name: str

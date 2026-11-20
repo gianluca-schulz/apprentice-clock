@@ -1,13 +1,10 @@
-from typing import Annotated
+from fastapi import APIRouter, HTTPException, status
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.config import Settings
 from app.core.auth import generate_token
-from app.database import get_session
-from app.dependencies.settings import get_settings
-from app.schemas.auth import RegisterRequest, SignInRequest, TokenResponse
+from app.dependencies.auth import CurrentUser
+from app.dependencies.database import CurrentSession
+from app.dependencies.settings import CurrentSettings
+from app.schemas.auth import RegisterRequest, SignInRequest, TokenResponse, UserResponse
 from app.services.auth import EmailAlreadyExistsError, InvalidCredentialsError, authenticate_user, register_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -15,12 +12,12 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def post_user(
-    session: Annotated[AsyncSession, Depends(get_session)],
-    settings: Annotated[Settings, Depends(get_settings)],
-    request: RegisterRequest,
+    session: CurrentSession,
+    settings: CurrentSettings,
+    body: RegisterRequest,
 ) -> TokenResponse:
     try:
-        user = await register_user(session, request)
+        user = await register_user(session, body)
     except EmailAlreadyExistsError:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="registration failed")
     return TokenResponse(access_token=generate_token(user.id, settings.secret_key, settings.token_expiration_days))
@@ -28,12 +25,17 @@ async def post_user(
 
 @router.post("/token", status_code=status.HTTP_200_OK)
 async def post_token(
-    session: Annotated[AsyncSession, Depends(get_session)],
-    settings: Annotated[Settings, Depends(get_settings)],
-    request: SignInRequest,
+    session: CurrentSession,
+    settings: CurrentSettings,
+    body: SignInRequest,
 ) -> TokenResponse:
     try:
-        user = await authenticate_user(session=session, body=request)
+        user = await authenticate_user(session=session, body=body)
     except InvalidCredentialsError:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
     return TokenResponse(access_token=generate_token(user.id, settings.secret_key, settings.token_expiration_days))
+
+
+@router.get("/me", status_code=status.HTTP_200_OK)
+async def get_me(user: CurrentUser) -> UserResponse:
+    return UserResponse.model_validate(user)
