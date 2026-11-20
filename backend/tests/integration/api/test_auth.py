@@ -1,8 +1,7 @@
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import jwt
-
-from app.models.user import User
 
 
 def test_register_works_and_returns_a_token(client):
@@ -108,12 +107,13 @@ def test_expired_token_gives_401(client, app_settings, registered_user):
     assert body["detail"] == "invalid credentials"
 
 
-async def test_deleted_user_gives_401(client, session, registered_user):
-    user = await session.get(User, registered_user.id)
-    assert user is not None
-    await session.delete(user)
-    await session.commit()
-    response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {registered_user.access_token}"})
+def test_token_for_unregistered_user_gives_401(client, app_settings):
+    secret_key = app_settings.secret_key
+    user_id = str(uuid4())
+    payload = {"sub": user_id, "exp": datetime.now(UTC) + timedelta(minutes=1)}
+    token = jwt.encode(payload=payload, key=secret_key, algorithm="HS256")
+    header = {"Authorization": f"Bearer {token}"}
+    response = client.get("/api/v1/auth/me", headers=header)
     assert response.status_code == 401
     body = response.json()
     assert body["detail"] == "invalid credentials"
