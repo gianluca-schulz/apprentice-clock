@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.api.auth import router as auth_router
 from app.api.health import router as health_router
+from app.api.work_day import router as work_day_router
 from app.config import AppState, Settings
 
 
@@ -21,4 +22,5 @@ def create_app(settings: Settings) -> FastAPI:
     app = FastAPI(title="apprentice-clock", version="0.1.0", lifespan=lifespan)
     app.include_router(health_router, prefix="/api/v1")
     app.include_router(auth_router, prefix="/api/v1")
+    app.include_router(work_day_router, prefix="/api/v1")
     return app

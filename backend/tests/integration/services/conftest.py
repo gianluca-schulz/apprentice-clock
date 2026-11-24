@@ -1,5 +1,6 @@
 import pytest
 
+from app.models.user import User
 from app.schemas.auth import RegisterRequest
 from app.services.auth import register_user
 
@@ -11,3 +12,12 @@ async def registered_user_data(session) -> RegisterRequest:
     )
     await register_user(session=session, body=body)
     return body
+
+
+@pytest.fixture()
+async def created_user(session) -> User:
+    body = RegisterRequest(
+        first_name="testname", last_name="testlastname", email="testemail@mail.com", password="test_password"
+    )
+    user = await register_user(session=session, body=body)
+    return user
