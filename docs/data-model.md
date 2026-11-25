@@ -24,76 +24,66 @@ The server never stores the password, only a hash of it. At login it hashes what
 ### Open points
 
 - Decided: the application generates the `id` (`uuid4`) and sets `created_at` and `updated_at` (in UTC), like learnOS does. `updated_at` is set again by the ORM on every update. Rows inserted by hand in `psql` are not a use case, so no database defaults are needed. Consequence: a manual `UPDATE` in `psql` does not change `updated_at`.
-- Decided: all timestamps use `timestamptz`, not `timestamp`. `timestamptz` stores a precise moment (converted to UTC), so it means the same thing in every time zone. A plain `timestamp` only stores the clock time without a zone, so it is unclear which moment it means. The same applies to `clock_in` and `clock_out`: hours worked is the difference between two moments, and with `timestamptz` that stays correct across time zones and summer time changes.
+- Decided: all timestamps use `timestamptz`, not `timestamp`. `timestamptz` stores a precise moment (converted to UTC), so it means the same thing in every time zone. A plain `timestamp` only stores the clock time without a zone, so it is unclear which moment it means.
 - Decided: emails are compared case-insensitively by lowercasing (and trimming whitespace) in the application before saving. Postgres does not do this itself, so every code path that saves an email must do it, otherwise the `UNIQUE` constraint would treat `Anna@example.com` and `anna@example.com` as different users.
 
 - Decided: `email_confirmed_at` was added in the second migration (`add_email_confirmed_at_to_users`). Nothing sets it yet: registration leaves it `NULL`. Confirming addresses comes in a later week, together with the confirmation email.
 
-## `work_days`
+## `reports`
 
-One row per work day of a user: one clock-in and, when the day ends, one clock-out together with the report. A user can clock in and out once per day. The report is required to clock out, which is the core idea of the app.
+One row per report: what a user did on one day, with a title and a description. A user writes at most one report per day. There is no time tracking for now (no clock-in or clock-out).
 
 | Column | Type | Constraints | Notes |
 | --- | --- | --- | --- |
 | `id` | `uuid` | primary key | |
-| `user_id` | `uuid` | `NOT NULL`, foreign key to `users.id` with `ON DELETE CASCADE` | Whose work day this is. |
-| `clock_in` | `timestamptz` | `NOT NULL` | When the work day started. The day of the work day is the day of this moment in the time zone `Europe/Berlin`. |
-| `clock_out` | `timestamptz` | nullable | `NULL` while the work day is open. |
-| `report` | `text` | nullable | `NULL` while the work day is open. Written together with `clock_out`. |
-| `created_at` | `timestamptz` | `NOT NULL` | Set when the row is created. |
-| `updated_at` | `timestamptz` | `NOT NULL` | Changes every time the row is updated. |
+| `user_id` | `uuid` | `NOT NULL`, foreign key to `users.id` with `ON DELETE CASCADE` | Whose report this is. |
+| `report_date` | `date` | `NOT NULL` | The day the report is about. Chosen and sent by the client. |
+| `title` | `text` | `NOT NULL` | A short heading for the day. |
+| `description` | `text` | `NOT NULL` | What was done. May be an empty string. |
 
-Index: a unique index on `user_id` and the day of `clock_in` in `Europe/Berlin` (an expression, not a column). One work day per user per day. See "One work day per day" below.
+Constraint: `UNIQUE (user_id, report_date)`. One report per user per day. See "One report per day" below.
 
 ### Why no separate index on `user_id`
 
-A unique index is sorted by its first column. The unique index above is sorted by `user_id` first and then by the day. So it also serves lookups by `user_id` alone, for example "all work days of a user", and the list of a user's work days newest first. A second index on `user_id` would only be a smaller copy of it. This only works because `user_id` is the first column of the index.
+Postgres builds an index for every unique constraint. The index of `UNIQUE (user_id, report_date)` is sorted by `user_id` first and then by `report_date`. So it also serves lookups by `user_id` alone, for example "all reports of a user", and the list of a user's reports newest first. A second index on `user_id` would only be a smaller copy of it. This only works because `user_id` is the first column of the constraint.
 
-### Why `created_at` and `updated_at` here
+### Why a `date` and no time zone
 
-Hours worked are calculated from `clock_in` and `clock_out`, not from these two columns. They record when the row was created and last changed. They match the `users` table, and `updated_at` gives an audit trail if a work day is corrected later, for example to fix a forgotten clock-in.
+`report_date` is a calendar day, not a moment, so it has the type `date`, which has no time and no time zone. The client says which day the report is about, and the server stores it as it is. The server never has to decide what "today" means, so no time zone is needed anywhere in the app. The date is required, so there is no default to guess.
+
+### Why no `created_at` and `updated_at`
+
+A report is a text about one day. Nothing in the app needs to know when a row was written or changed. Consequence: there is no record of when a report was created or edited. If that becomes important (for example when time tracking comes later), the columns can be added through a migration.
 
 ### Rules
 
-- One user has many work days (one-to-many), at most one per day. Each work day belongs to exactly one user.
-- A work day is open when `clock_out IS NULL`. It stays open until the user clocks out. Nothing runs on the server while it is open; it is only a row.
-- Every clock-out needs a report. The API sets `clock_out` and `report` in the same update. One update of one row is atomic, so no transaction over several tables is needed.
-- Clock-in creates a new row. Clock-out updates the open row of the user.
-- Clocking in a second time on the same day is refused.
-- A work day that is already closed cannot be clocked out again. `clock_out` must not be before `clock_in`.
-- Clocking in while an older work day is still open is refused. The old work day must be closed first, with the real clock-out time and a report.
+- One user has many reports (one-to-many), at most one per day. Each report belongs to exactly one user.
+- The owner is the logged-in user, taken from the token, never from the request body.
+- The `title` is required and must not be empty after trimming whitespace. The `description` may be empty.
+- A report can be read, changed (all fields, including the date) and deleted by its owner only.
 
-### One work day per day
+### One report per day
 
-The rule "once per day" needs a day to compare. A `timestamptz` is a moment, not a day. The day is part of `clock_in`, so there is no column for it: the database enforces the rule with a unique index on `user_id` and the day of `clock_in`, converted to the time zone `Europe/Berlin`. The API checks first and answers `409 Conflict` with `already clocked in`. Two clock-in requests can arrive at the same moment (a double click), and then both can pass the check of the API, because the lookup and the insert are two separate steps. The index rejects the second insert, and the API catches the integrity error and answers the same way.
-
-The day depends on a time zone: 23:30 in Berlin is already the next day in UTC. That is why the index converts to `Europe/Berlin` before it takes the day. See the decision below.
-
-### Daily report
-
-There is no separate daily report. The report of the work day is the report of the day, because there is one work day per day. Downloading the reports (a feature of the first version) reads this column.
+The rule "once per day" is enforced by the database with `UNIQUE (user_id, report_date)`. The API checks first and answers `409 Conflict` when the user already has a report for that date. Two create requests can arrive at the same moment (a double click), and then both can pass the check of the API, because the lookup and the insert are two separate steps. The constraint rejects the second insert, and the API catches the integrity error and answers the same way.
 
 ## Open points
 
-- Decided: the foreign key `user_id` uses `ON DELETE CASCADE`. When a user deletes their account, Postgres deletes all their work days, and their reports with them. At the start the app is only for the apprentice, not for a company, so the data belongs to the apprentice and does not have to be kept anywhere else. This replaces the first decision (`RESTRICT`), which was changed after the review by Max. Trade-off: a wrong `DELETE` on `users` really wipes someone's hours and reports, so deleting a user must only happen through a deliberate "delete my account" action. `SET NULL` does not work with `NOT NULL`.
+- Decided: the foreign key `user_id` uses `ON DELETE CASCADE`. When a user deletes their account, Postgres deletes all their reports. At the start the app is only for the apprentice, not for a company, so the data belongs to the apprentice and does not have to be kept anywhere else. Trade-off: a wrong `DELETE` on `users` really wipes someone's reports, so deleting a user must only happen through a deliberate "delete my account" action.
 - Not planned: a soft delete (for example a `deleted_at` column on `users`), because deleting an account should really remove the data. This can be revisited if a company needs to keep the training log.
-- Decided: the report is a column of `work_days`, not its own table. With one work day per day and one report per work day, a second table would only hold one more value of the same row. The report is not a separate resource in the API.
-- Decided: one clock-in and one clock-out per day, with the report written at clock-out. This keeps the idea of the app (the report is a condition for clocking out). Several work periods per day (for example around a lunch break) are not possible in the first version.
-- Decided: the table is called `work_days` (model `WorkDay`), because one row is one work day of a user. The name `work_sessions` was dropped, because "session" suggests several per day. The name `reports` was dropped, because the report is only one column of the row.
-- Decided: no separate index on `user_id`, see "Why no separate index on `user_id`".
-- Decided: no `CHECK` constraint for "clock-out requires a report" for now. The API enforces the rule first. What counts as a valid report (for example a minimum length) is a product decision that belongs in the API. Because the report is in the same row as `clock_out`, a `CHECK` such as `(clock_out IS NULL) = (report IS NULL)` would be possible later through a migration, as long as the existing data already follows the rule.
-- Decided: forgotten clock-outs. A clock-in is refused while an older work day of the user is still open. The user first closes the old work day with the real clock-out time and a report, and only then can clock in. This keeps the rule "every clock-out needs a report" without exceptions and keeps the hours correct. Rejected: closing the old work day automatically at the next clock-in or at midnight. It would have no report, which is the problem the app exists to solve, and the real clock-out time is only known to the user (using "now" would add the night to the hours, a guess like midnight is wrong if the person left at 17:00). To confirm with Max.
-- Decided: no partial unique index on `user_id` where `clock_out IS NULL` (at most one open work day per user) for now. The double click is already covered by the unique index on `user_id` and the day of `clock_in`. The API enforces "at most one open work day" with the check above. The index would only matter if two clock-ins on different days arrived at the same moment (around midnight), which is very unlikely. It can be added later through a migration if a bug shows that it is needed. To confirm with Max.
-- Decided: one fixed time zone for the whole app, `Europe/Berlin`. The day of a work day is the day of `clock_in` in that zone. The unique index and the API use the same zone. Python's `zoneinfo` and Postgres handle the switch between summer and winter time. The day never changes afterwards, because `clock_in` is not changed: a work day that is closed on the next day keeps the day of its clock-in. The users are apprentices at German companies, so one zone fits the first version. If users in other time zones come later, a time zone per user can be added to `users`, and the index must be replaced through a migration, because the zone is written into it. To confirm with Max.
-- Decided: no `work_date` column. It was in the first version, so the database could enforce "once per day" with a plain `UNIQUE (user_id, work_date)`. After the review by Max ("is this needed if we have the clock-in date time?") it was removed, because the day is part of `clock_in` and a second column could disagree with it. Trade-off: the unique index is an expression, which is harder to read and ties the time zone into the database; queries by day must convert `clock_in` to `Europe/Berlin` the same way.
-- Decided: `clock_out` must not be before `clock_in`. The API checks it and answers `422` with a clear message. Nobody does it on purpose, but a user who closes a forgotten work day types the clock-out time by hand, and a typo (08:00 instead of 18:00) would give negative hours and wrong sums. There is no `CHECK (clock_out >= clock_in)` in the database for now: the API is the only way to write the row, and the user needs a readable error message anyway. Both columns are in the same row, so the `CHECK` can be added later through a migration, as long as the existing data already follows the rule.
-- Decided: each work day has exactly one clock-out. Once `clock_out` is set, the row is closed and a second clock-out on it is refused. Closing a forgotten work day on the next day does not conflict with the rule "one clock-in per day": it updates the old row, while the new clock-in creates a different row with another day.
+- Decided: the app starts with reports only and no time tracking. The first design had a `work_days` table with `clock_in`, `clock_out` and the report in one row. After the review by Max (PR #26) it was dropped: it was too complicated for a first version and did not lend itself to being changed later. Time tracking can come back later as its own table, connected to reports. The `work_days` table is removed by a migration, so the migration history stays intact.
+- Decided: the client sends `report_date`, and it is required. This avoids a server time zone and a "today" default. A report for a day in the future is not refused for now. This can be revisited if it causes problems.
+- Decided: one report per day, with `UNIQUE (user_id, report_date)`. Several reports on the same day are not possible in the first version.
+- Decided: the column is called `report_date`, not `date`, because `date` is also the name of a SQL type.
+- Decided: `title` and `description` have no maximum length for now. The `description` is `NOT NULL` and may be empty, so the client never has to handle `null` for it. The API treats a missing description as an empty one.
+- Decided: no `CHECK` constraints for now. What counts as a valid title (not empty after trimming) belongs in the API, so the user gets a readable error.
+- Decided: no `created_at` and `updated_at` on `reports`, see above.
+- Decided: every field of a report can be changed, including `report_date`. A change of the date that collides with another report of that day (same user) is refused with `409`, because of `UNIQUE (user_id, report_date)`. The API checks first, and the constraint catches two requests at the same moment, like at create.
 
 ## ER diagram
 
 ```mermaid
 erDiagram
-    users ||--o{ work_days : "has"
+    users ||--o{ reports : "has"
     users {
         uuid id PK
         text first_name
@@ -104,13 +94,11 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
-    work_days {
+    reports {
         uuid id PK
         uuid user_id FK
-        timestamptz clock_in
-        timestamptz clock_out
-        text report
-        timestamptz created_at
-        timestamptz updated_at
+        date report_date
+        text title
+        text description
     }
 ```
