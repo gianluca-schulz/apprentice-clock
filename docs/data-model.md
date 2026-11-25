@@ -37,19 +37,19 @@ One row per report: what a user did on one day, with a title and a description. 
 | --- | --- | --- | --- |
 | `id` | `uuid` | primary key | |
 | `user_id` | `uuid` | `NOT NULL`, foreign key to `users.id` with `ON DELETE CASCADE` | Whose report this is. |
-| `report_date` | `date` | `NOT NULL` | The day the report is about. Chosen and sent by the client. |
+| `date` | `date` | `NOT NULL` | The day the report is about. Chosen and sent by the client. |
 | `title` | `text` | `NOT NULL` | A short heading for the day. |
 | `description` | `text` | `NOT NULL` | What was done. May be an empty string. |
 
-Constraint: `UNIQUE (user_id, report_date)`. One report per user per day. See "One report per day" below.
+Constraint: `UNIQUE (user_id, date)`. One report per user per day. See "One report per day" below.
 
 ### Why no separate index on `user_id`
 
-Postgres builds an index for every unique constraint. The index of `UNIQUE (user_id, report_date)` is sorted by `user_id` first and then by `report_date`. So it also serves lookups by `user_id` alone, for example "all reports of a user", and the list of a user's reports newest first. A second index on `user_id` would only be a smaller copy of it. This only works because `user_id` is the first column of the constraint.
+Postgres builds an index for every unique constraint. The index of `UNIQUE (user_id, date)` is sorted by `user_id` first and then by `date`. So it also serves lookups by `user_id` alone, for example "all reports of a user", and the list of a user's reports newest first. A second index on `user_id` would only be a smaller copy of it. This only works because `user_id` is the first column of the constraint.
 
 ### Why a `date` and no time zone
 
-`report_date` is a calendar day, not a moment, so it has the type `date`, which has no time and no time zone. The client says which day the report is about, and the server stores it as it is. The server never has to decide what "today" means, so no time zone is needed anywhere in the app. The date is required, so there is no default to guess.
+`date` is a calendar day, not a moment, so it has the type `date`, which has no time and no time zone. The client says which day the report is about, and the server stores it as it is. The server never has to decide what "today" means, so no time zone is needed anywhere in the app. The date is required, so there is no default to guess.
 
 ### Why no `created_at` and `updated_at`
 
@@ -64,20 +64,20 @@ A report is a text about one day. Nothing in the app needs to know when a row wa
 
 ### One report per day
 
-The rule "once per day" is enforced by the database with `UNIQUE (user_id, report_date)`. The API checks first and answers `409 Conflict` when the user already has a report for that date. Two create requests can arrive at the same moment (a double click), and then both can pass the check of the API, because the lookup and the insert are two separate steps. The constraint rejects the second insert, and the API catches the integrity error and answers the same way.
+The rule "once per day" is enforced by the database with `UNIQUE (user_id, date)`. The API checks first and answers `409 Conflict` when the user already has a report for that date. Two create requests can arrive at the same moment (a double click), and then both can pass the check of the API, because the lookup and the insert are two separate steps. The constraint rejects the second insert, and the API catches the integrity error and answers the same way.
 
 ## Open points
 
 - Decided: the foreign key `user_id` uses `ON DELETE CASCADE`. When a user deletes their account, Postgres deletes all their reports. At the start the app is only for the apprentice, not for a company, so the data belongs to the apprentice and does not have to be kept anywhere else. Trade-off: a wrong `DELETE` on `users` really wipes someone's reports, so deleting a user must only happen through a deliberate "delete my account" action.
 - Not planned: a soft delete (for example a `deleted_at` column on `users`), because deleting an account should really remove the data. This can be revisited if a company needs to keep the training log.
 - Decided: the app starts with reports only and no time tracking. The first design had a `work_days` table with `clock_in`, `clock_out` and the report in one row. After the review by Max (PR #26) it was dropped: it was too complicated for a first version and did not lend itself to being changed later. Time tracking can come back later as its own table, connected to reports. The `work_days` table is removed by a migration, so the migration history stays intact.
-- Decided: the client sends `report_date`, and it is required. This avoids a server time zone and a "today" default. A report for a day in the future is not refused for now. This can be revisited if it causes problems.
-- Decided: one report per day, with `UNIQUE (user_id, report_date)`. Several reports on the same day are not possible in the first version.
-- Decided: the column is called `report_date`, not `date`, because `date` is also the name of a SQL type.
+- Decided: the client sends `date`, and it is required. This avoids a server time zone and a "today" default. A report for a day in the future is not refused for now. This can be revisited if it causes problems.
+- Decided: one report per day, with `UNIQUE (user_id, date)`. Several reports on the same day are not possible in the first version.
+- Decided: the column is called `date`, without a prefix like `report_`. The table is already called `reports`, so the prefix would say "report" twice (like `first_name` in `users`, not `user_first_name`). After the review by Max. `date` is also the name of a SQL type, but PostgreSQL allows it as a column name. In Python the model needs `datetime.date` as the type, so the column name does not hide it.
 - Decided: `title` and `description` have no maximum length for now. The `description` is `NOT NULL` and may be empty, so the client never has to handle `null` for it. The API treats a missing description as an empty one.
 - Decided: no `CHECK` constraints for now. What counts as a valid title (not empty after trimming) belongs in the API, so the user gets a readable error.
 - Decided: no `created_at` and `updated_at` on `reports`, see above.
-- Decided: every field of a report can be changed, including `report_date`. A change of the date that collides with another report of that day (same user) is refused with `409`, because of `UNIQUE (user_id, report_date)`. The API checks first, and the constraint catches two requests at the same moment, like at create.
+- Decided: every field of a report can be changed, including `date`. A change of the date that collides with another report of that day (same user) is refused with `409`, because of `UNIQUE (user_id, date)`. The API checks first, and the constraint catches two requests at the same moment, like at create.
 
 ## ER diagram
 
@@ -97,7 +97,7 @@ erDiagram
     reports {
         uuid id PK
         uuid user_id FK
-        date report_date
+        date date
         text title
         text description
     }
