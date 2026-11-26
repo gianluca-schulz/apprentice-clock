@@ -13,7 +13,7 @@ async def post_report(session: CurrentSession, body: ReportRequest, user: Curren
     try:
         report = await create_report(session=session, body=body, user_id=user.id)
     except ReportAlreadyExistsError:
-        raise HTTPException(status.HTTP_409_CONFLICT, detail="create report failed")
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="report for this date already exists")
     return ReportResponse.model_validate(report)
 
 
