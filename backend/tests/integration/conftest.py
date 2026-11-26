@@ -8,6 +8,7 @@ from testcontainers.community.postgres import PostgresContainer
 
 from app.config import Settings
 from app.models.base import Base
+from app.models.user import User
 from app.setup import create_app
 
 
@@ -56,3 +57,26 @@ async def session(session_factory) -> AsyncIterator[AsyncSession]:
 def client(app, engine) -> Iterator[TestClient]:
     with TestClient(app) as client:
         yield client
+
+
+@pytest.fixture()
+async def saved_user(session_factory) -> User:
+    user = User(first_name="testname", last_name="testlastname", email="test@email.com", password_hash="passwordhash")
+    async with session_factory() as session:
+        session.add(user)
+        await session.commit()
+    return user
+
+
+@pytest.fixture()
+async def second_saved_user(session_factory) -> User:
+    user = User(
+        first_name="secondtestname",
+        last_name="secondtestlastname",
+        email="secondtest@email.com",
+        password_hash="secondpasswordhash",
+    )
+    async with session_factory() as session:
+        session.add(user)
+        await session.commit()
+    return user
