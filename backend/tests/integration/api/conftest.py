@@ -36,3 +36,8 @@ def registered_user(client, app_settings) -> RegisteredUser:
         password=register_data["password"],
         access_token=access_token,
     )
+
+
+@pytest.fixture()
+def auth_header(registered_user) -> dict[str, str]:
+    return {"Authorization": f"Bearer {registered_user.access_token}"}
