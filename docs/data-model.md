@@ -38,7 +38,7 @@ One row per report: what a user did on one day, with a title and a description. 
 | `id` | `uuid` | primary key | |
 | `user_id` | `uuid` | `NOT NULL`, foreign key to `users.id` with `ON DELETE CASCADE` | Whose report this is. |
 | `date` | `date` | `NOT NULL` | The day the report is about. Chosen and sent by the client. |
-| `title` | `text` | `NOT NULL` | A short heading for the day. |
+| `title` | `text` | `NOT NULL` | A short heading for the day. May be an empty string. |
 | `description` | `text` | `NOT NULL` | What was done. May be an empty string. |
 
 Constraint: `UNIQUE (user_id, date)`. One report per user per day. See "One report per day" below.
@@ -59,12 +59,12 @@ A report is a text about one day. Nothing in the app needs to know when a row wa
 
 - One user has many reports (one-to-many), at most one per day. Each report belongs to exactly one user.
 - The owner is the logged-in user, taken from the token, never from the request body.
-- The `title` is required and must not be empty after trimming whitespace. The `description` may be empty.
+- The `title` and the `description` may both be empty, so a report can be created with only a date and filled in later. A missing text field counts as an empty one. Nothing is trimmed: the text is stored as the client sent it.
 - A report can be read, changed (all fields, including the date) and deleted by its owner only.
 
 ### One report per day
 
-The rule "once per day" is enforced by the database with `UNIQUE (user_id, date)`. The API checks first and answers `409 Conflict` when the user already has a report for that date. Two create requests can arrive at the same moment (a double click), and then both can pass the check of the API, because the lookup and the insert are two separate steps. The constraint rejects the second insert, and the API catches the integrity error and answers the same way.
+The rule "once per day" is enforced by the database with `UNIQUE (user_id, date)`. The API does not check first: it inserts, and when the constraint rejects the insert, the service turns that error into `ReportAlreadyExistsError` and the API answers `409 Conflict`. This also covers two create requests that arrive at the same moment (a double click), because the database decides and there is no gap between a check and an insert. Only the constraint `uq_reports_user_id_date` is treated this way. Any other integrity error is not a duplicate and is passed on.
 
 ## Open points
 
@@ -74,10 +74,11 @@ The rule "once per day" is enforced by the database with `UNIQUE (user_id, date)
 - Decided: the client sends `date`, and it is required. This avoids a server time zone and a "today" default. A report for a day in the future is not refused for now. This can be revisited if it causes problems.
 - Decided: one report per day, with `UNIQUE (user_id, date)`. Several reports on the same day are not possible in the first version.
 - Decided: the column is called `date`, without a prefix like `report_`. The table is already called `reports`, so the prefix would say "report" twice (like `first_name` in `users`, not `user_first_name`). After the review by Max. `date` is also the name of a SQL type, but PostgreSQL allows it as a column name. In Python the model needs `datetime.date` as the type, so the column name does not hide it.
-- Decided: `title` and `description` have no maximum length for now. The `description` is `NOT NULL` and may be empty, so the client never has to handle `null` for it. The API treats a missing description as an empty one.
-- Decided: no `CHECK` constraints for now. What counts as a valid title (not empty after trimming) belongs in the API, so the user gets a readable error.
+- Decided: `title` and `description` have no maximum length for now. Both are `NOT NULL` and may be empty, so the client never has to handle `null` for them. The API treats a missing title or description as an empty one, and refuses an explicit `null`. After the review by Max (PR #29): a report may be created with only a date and filled in later, so there is no rule about empty text.
+- Decided: nothing is trimmed. Title and description are stored exactly as sent. Trimming can be added later if stray spaces cause problems.
+- Decided: no `CHECK` constraints for now, because no text field has a rule.
 - Decided: no `created_at` and `updated_at` on `reports`, see above.
-- Decided: every field of a report can be changed, including `date`. A change of the date that collides with another report of that day (same user) is refused with `409`, because of `UNIQUE (user_id, date)`. The API checks first, and the constraint catches two requests at the same moment, like at create.
+- Decided: every field of a report can be changed, including `date`. A change of the date that collides with another report of that day (same user) is refused with `409`, because of `UNIQUE (user_id, date)`. The database decides, like at create, so two requests at the same moment are handled the same way.
 
 ## ER diagram
 
