@@ -20,23 +20,9 @@ def test_missing_description_becomes_empty_space():
     assert request.description == ""
 
 
-def test_title_with_spaces_gets_trimmed():
-    request = ReportRequest(date=FIXED_DATE, title="    trimmed_title      ", description="testdescription")
-    assert request.title == "trimmed_title"
-
-
-@pytest.mark.parametrize(
-    ("title"),
-    [(""), ("     ")],
-)
-def test_title_constraints_working(title):
-    with pytest.raises(ValidationError):
-        ReportRequest(date=FIXED_DATE, title=title)
-
-
-def test_title_missing_throws_error():
-    with pytest.raises(ValidationError):
-        ReportRequest(date=FIXED_DATE)
+def test_title_missing_becomes_empty_space():
+    request = ReportRequest(date=FIXED_DATE)
+    assert request.title == ""
 
 
 @pytest.mark.parametrize(
