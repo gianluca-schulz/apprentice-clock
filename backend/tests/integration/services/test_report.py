@@ -62,7 +62,7 @@ async def test_unknown_user_raises_integrity_error_and_not_report_already_exists
 
 async def test_user_without_reports_returns_empty_list(session, saved_user):
     reportlist = await list_reports(session=session, user_id=saved_user.id)
-    assert reportlist == []
+    assert len(reportlist) == 0
 
 
 async def test_reports_return_ordered(session, session_factory, saved_user):
