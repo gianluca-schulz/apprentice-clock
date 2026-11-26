@@ -6,6 +6,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 
+UNIQUE_DATE_CONSTRAINT = "uq_reports_user_id_date"
+
 
 class Report(Base):
     __tablename__ = "reports"
@@ -14,4 +16,4 @@ class Report(Base):
     date: Mapped[datetime.date] = mapped_column(Date)
     title: Mapped[str] = mapped_column(Text)
     description: Mapped[str] = mapped_column(Text)
-    __table_args__ = (UniqueConstraint("user_id", "date", name="uq_reports_user_id_date"),)
+    __table_args__ = (UniqueConstraint("user_id", "date", name=UNIQUE_DATE_CONSTRAINT),)

@@ -4,15 +4,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.report import Report
+from app.models.report import UNIQUE_DATE_CONSTRAINT, Report
 from app.schemas.report import ReportRequest
 
 
 class ReportAlreadyExistsError(Exception):
     pass
-
-
-UNIQUE_DATE_CONSTRAINT = "uq_reports_user_id_date"
 
 
 async def create_report(session: AsyncSession, body: ReportRequest, user_id: UUID) -> Report:
