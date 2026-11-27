@@ -94,23 +94,13 @@ def test_get_reports_returns_newest_date_first(client, auth_header):
     assert body[2]["date"] == "2025-11-26"
 
 
-def test_get_reports_returns_only_own_reports(client, auth_header):
+def test_get_reports_returns_only_own_reports(client, auth_header, second_auth_header):
     response = client.post("/api/v1/reports", json=REQUEST_2026, headers=auth_header)
     assert response.status_code == 201
-    register_data = {
-        "first_name": "Thorsten",
-        "last_name": "Thorstenson",
-        "email": "thorsten@son.com",
-        "password": "torstenson123987",
-    }
-    register_response = client.post("/api/v1/auth/register", json=register_data)
-    assert register_response.status_code == 201
-    access_token = register_response.json()["access_token"]
-    second_header = {"Authorization": f"Bearer {access_token}"}
-    second_report_response = client.post("/api/v1/reports", json=REQUEST_2025, headers=second_header)
+    second_report_response = client.post("/api/v1/reports", json=REQUEST_2025, headers=second_auth_header)
     assert second_report_response.status_code == 201
     first_list_response = client.get("/api/v1/reports", headers=auth_header)
-    second_list_response = client.get("/api/v1/reports", headers=second_header)
+    second_list_response = client.get("/api/v1/reports", headers=second_auth_header)
     assert first_list_response.status_code == 200
     assert second_list_response.status_code == 200
     assert len(first_list_response.json()) == 1
