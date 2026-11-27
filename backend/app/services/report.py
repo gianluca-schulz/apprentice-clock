@@ -12,6 +12,10 @@ class ReportAlreadyExistsError(Exception):
     pass
 
 
+class ReportNotFoundError(Exception):
+    pass
+
+
 async def create_report(session: AsyncSession, body: ReportRequest, user_id: UUID) -> Report:
     report = Report(user_id=user_id, date=body.date, title=body.title, description=body.description)
 
@@ -30,3 +34,11 @@ async def list_reports(session: AsyncSession, user_id: UUID) -> list[Report]:
     query = select(Report).where(Report.user_id == user_id).order_by(Report.date.desc())
     result = await session.scalars(query)
     return list(result.all())
+
+
+async def get_owned_report(session: AsyncSession, user_id: UUID, report_id: UUID) -> Report:
+    query = select(Report).where(Report.user_id == user_id, Report.id == report_id)
+    report = await session.scalar(query)
+    if report is None:
+        raise ReportNotFoundError
+    return report

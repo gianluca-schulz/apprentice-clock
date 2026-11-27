@@ -107,3 +107,38 @@ def test_get_reports_returns_only_own_reports(client, auth_header, second_auth_h
     assert len(second_list_response.json()) == 1
     assert first_list_response.json()[0]["date"] == REQUEST_2026["date"]
     assert second_list_response.json()[0]["date"] == REQUEST_2025["date"]
+
+
+def test_get_report_returns_200_and_the_report(client, auth_header, created_report):
+    get_response = client.get(f"/api/v1/reports/{created_report['id']}", headers=auth_header)
+    assert get_response.status_code == 200
+    get_body = get_response.json()
+    assert get_body["date"] == created_report["date"]
+    assert get_body["description"] == created_report["description"]
+    assert get_body["title"] == created_report["title"]
+    assert get_body["id"] == created_report["id"]
+    assert get_body["user_id"] == created_report["user_id"]
+
+
+def test_get_report_of_another_user_returns_404(client, auth_header, second_auth_header, created_report):
+    other_get_response = client.get(f"/api/v1/reports/{created_report['id']}", headers=second_auth_header)
+    assert other_get_response.status_code == 404
+    assert other_get_response.json()["detail"] == "Report was not found"
+    get_response = client.get(f"/api/v1/reports/{created_report['id']}", headers=auth_header)
+    assert get_response.status_code == 200
+
+
+def test_get_unknown_report_returns_404(client, auth_header, created_report):
+    get_response = client.get(f"/api/v1/reports/{uuid4()}", headers=auth_header)
+    assert get_response.status_code == 404
+    assert get_response.json()["detail"] == "Report was not found"
+
+
+def test_get_report_with_invalid_id_returns_422(client, auth_header):
+    get_response = client.get("/api/v1/reports/abc", headers=auth_header)
+    assert get_response.status_code == 422
+
+
+def test_get_report_without_token_returns_401(client):
+    get_response = client.get(f"/api/v1/reports/{uuid4()}")
+    assert get_response.status_code == 401

@@ -7,7 +7,13 @@ from sqlalchemy.exc import IntegrityError
 
 from app.models.report import Report
 from app.schemas.report import ReportRequest
-from app.services.report import ReportAlreadyExistsError, create_report, list_reports
+from app.services.report import (
+    ReportAlreadyExistsError,
+    ReportNotFoundError,
+    create_report,
+    get_owned_report,
+    list_reports,
+)
 
 REQUEST_2026 = ReportRequest(date=datetime.date(2026, 11, 26), title="testtitle", description="testdescription")
 
@@ -85,3 +91,23 @@ async def test_list_contains_only_own_reports(session, session_factory, saved_us
         assert len(reportlist) == 1
         assert reportlist[0].date == REQUEST_2026.date
         assert reportlist[0].user_id == saved_user.id
+
+
+async def test_owner_gets_the_report(session_factory, saved_user, saved_report):
+    async with session_factory() as report_session:
+        report = await get_owned_report(session=report_session, user_id=saved_user.id, report_id=saved_report.id)
+    assert report.date == saved_report.date
+    assert report.user_id == saved_user.id
+    assert report.id == saved_report.id
+
+
+async def test_other_user_gets_report_not_found(session_factory, second_saved_user, saved_report):
+    async with session_factory() as report_session:
+        with pytest.raises(ReportNotFoundError):
+            await get_owned_report(session=report_session, user_id=second_saved_user.id, report_id=saved_report.id)
+
+
+async def test_unknown_report_id_gets_report_not_found(session_factory, saved_user, saved_report):
+    async with session_factory() as report_session:
+        with pytest.raises(ReportNotFoundError):
+            await get_owned_report(session=report_session, user_id=saved_user.id, report_id=uuid4())

@@ -68,3 +68,14 @@ def second_registered_user(client, app_settings) -> RegisteredUser:
 @pytest.fixture()
 def second_auth_header(second_registered_user) -> dict[str, str]:
     return {"Authorization": f"Bearer {second_registered_user.access_token}"}
+
+
+@pytest.fixture()
+def created_report(client, auth_header) -> dict[str, str]:
+    response = client.post(
+        "/api/v1/reports",
+        json={"date": "2026-11-26", "title": "splitting wood", "description": "i chopped"},
+        headers=auth_header,
+    )
+    assert response.status_code == 201
+    return response.json()
