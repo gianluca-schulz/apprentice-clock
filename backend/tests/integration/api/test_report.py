@@ -123,7 +123,7 @@ def test_get_report_returns_200_and_the_report(client, auth_header, created_repo
 def test_get_report_of_another_user_returns_404(client, auth_header, second_auth_header, created_report):
     other_get_response = client.get(f"/api/v1/reports/{created_report['id']}", headers=second_auth_header)
     assert other_get_response.status_code == 404
-    assert other_get_response.json()["detail"] == "Report was not found"
+    assert other_get_response.json()["detail"] == "report was not found"
     get_response = client.get(f"/api/v1/reports/{created_report['id']}", headers=auth_header)
     assert get_response.status_code == 200
 
@@ -131,7 +131,7 @@ def test_get_report_of_another_user_returns_404(client, auth_header, second_auth
 def test_get_unknown_report_returns_404(client, auth_header, created_report):
     get_response = client.get(f"/api/v1/reports/{uuid4()}", headers=auth_header)
     assert get_response.status_code == 404
-    assert get_response.json()["detail"] == "Report was not found"
+    assert get_response.json()["detail"] == "report was not found"
 
 
 def test_get_report_with_invalid_id_returns_422(client, auth_header):
@@ -142,3 +142,37 @@ def test_get_report_with_invalid_id_returns_422(client, auth_header):
 def test_get_report_without_token_returns_401(client):
     get_response = client.get(f"/api/v1/reports/{uuid4()}")
     assert get_response.status_code == 401
+
+
+def test_delete_report_returns_204_and_removes_it(client, created_report, auth_header):
+    response = client.delete(f"/api/v1/reports/{created_report['id']}", headers=auth_header)
+    assert response.status_code == 204
+    assert response.content == b""
+    get_response = client.get(f"/api/v1/reports/{created_report['id']}", headers=auth_header)
+    assert get_response.status_code == 404
+    list_response = client.get("/api/v1/reports", headers=auth_header)
+    assert list_response.status_code == 200
+    ids = [report["id"] for report in list_response.json()]
+    assert created_report["id"] not in ids
+
+
+def test_delete_report_of_another_user_returns_404(client, created_report, auth_header, second_auth_header):
+    response = client.delete(f"/api/v1/reports/{created_report['id']}", headers=second_auth_header)
+    assert response.status_code == 404
+    get_response = client.get(f"/api/v1/reports/{created_report['id']}", headers=auth_header)
+    assert get_response.status_code == 200
+
+
+def test_delete_unknown_report_returns_404(client, created_report, auth_header):
+    response = client.delete(f"/api/v1/reports/{uuid4()}", headers=auth_header)
+    assert response.status_code == 404
+
+
+def test_delete_report_without_token_returns_401(client):
+    response = client.delete(f"/api/v1/reports/{uuid4()}")
+    assert response.status_code == 401
+
+
+def test_delete_report_with_invalid_id_returns_422(client, auth_header):
+    response = client.delete("/api/v1/reports/abc", headers=auth_header)
+    assert response.status_code == 422
