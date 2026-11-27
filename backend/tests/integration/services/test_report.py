@@ -11,6 +11,7 @@ from app.services.report import (
     ReportAlreadyExistsError,
     ReportNotFoundError,
     create_report,
+    delete_report,
     get_owned_report,
     list_reports,
 )
@@ -111,3 +112,25 @@ async def test_unknown_report_id_gets_report_not_found(session_factory, saved_us
     async with session_factory() as report_session:
         with pytest.raises(ReportNotFoundError):
             await get_owned_report(session=report_session, user_id=saved_user.id, report_id=uuid4())
+
+
+async def test_delete_report_removes_the_report(session, saved_report, saved_user, session_factory):
+    await delete_report(session=session, user_id=saved_user.id, report_id=saved_report.id)
+    async with session_factory() as report_session:
+        with pytest.raises(ReportNotFoundError):
+            await get_owned_report(session=report_session, user_id=saved_user.id, report_id=saved_report.id)
+
+
+async def test_delete_report_of_another_user_raises_not_found(
+    session, saved_user, saved_report, session_factory, second_saved_user
+):
+    with pytest.raises(ReportNotFoundError):
+        await delete_report(session=session, user_id=second_saved_user.id, report_id=saved_report.id)
+    async with session_factory() as report_session:
+        report = await get_owned_report(session=report_session, user_id=saved_user.id, report_id=saved_report.id)
+    assert report.id == saved_report.id
+
+
+async def test_delete_unknown_report_raises_not_found(session, saved_user, saved_report):
+    with pytest.raises(ReportNotFoundError):
+        await delete_report(session=session, user_id=saved_user.id, report_id=uuid4())

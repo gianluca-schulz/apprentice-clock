@@ -42,3 +42,9 @@ async def get_owned_report(session: AsyncSession, user_id: UUID, report_id: UUID
     if report is None:
         raise ReportNotFoundError
     return report
+
+
+async def delete_report(session: AsyncSession, user_id: UUID, report_id: UUID) -> None:
+    report = await get_owned_report(session=session, user_id=user_id, report_id=report_id)
+    await session.delete(report)
+    await session.commit()
